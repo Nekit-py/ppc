@@ -12,10 +12,8 @@ fn type_of<T>(_: T) -> &'static str {
 
 fn git_initialization(path: &str) -> Result<(), Box<dyn Error>> {
     //Инициализация гита
-    //Скорее всего функция работает некорректно...
-    change_dir(&path);
     println!("Инициализирую git репозитория...");
-    let _git_init = Command::new("git").arg("init").status()?;
+    let _git_init = Command::new("git").current_dir(path).arg("init").status()?;
     Ok(())
 }
 
