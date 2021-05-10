@@ -12,8 +12,9 @@ fn type_of<T>(_: T) -> &'static str {
 
 fn git_initialization(path: &str) -> Result<(), Box<dyn Error>> {
     //Инициализация гита
+    //Скорее всего функция работает некорректно...
     change_dir(&path);
-    println!("Инициализирую git репозиторий...");
+    println!("Инициализирую git репозитория...");
     let _git_init = Command::new("git").arg("init").status()?;
     Ok(())
 }
@@ -26,21 +27,23 @@ fn change_dir(path: &str) {
         .expect("an unknown error occurred");
 }
 
-fn create_dir(proj_name: &str) -> std::io::Result<()> {
+fn create_dir(where_to_create: &str, dir_name: &str) -> std::io::Result<()> {
     //Создание пустой папки
-    fs::create_dir(proj_name)?;
+    fs::create_dir([where_to_create, "/", dir_name].join(""))?;
     Ok(())
 }
 
-fn create_venv(proj_name: &str) -> Result<(), Box<dyn Error>> {
+fn create_venv(proj_path: &str, proj_name: &str) -> Result<(), Box<dyn Error>> {
     //Создание виртуального окружения и пустого репозитория git
-    let proj_venv: &str = &[proj_name, "/venv"].join("");
+    let proj_venv: &str = &[proj_path, "/venv"].join("");
     let _cvenv = Command::new("python3")
         .args(&["-m", "venv", proj_venv])
         .status()?;
-    create_dir(&[proj_name, "/git"].join(""));
-    let mut gitignore = File::create(&[proj_name, "/git/.gitignore"].join(""))?;
+    create_dir(&proj_path, "git");
+    let mut gitignore = File::create(&[proj_path, "/git/.gitignore"].join(""))?;
     gitignore.write_all(b"__pycache__")?;
+    let mut py_file = File::create(&[proj_path, "/git/", proj_name, ".py"].join(""))?;
+    py_file.write_all(b"def main():\n\tprint('Hello, world!')\n\nif __name__ == '__main__':\n\tmain()")?;
     Ok(())
 }
 
@@ -65,7 +68,7 @@ fn check_project_name() -> String {
     //string.chars().filter(..).collect()
     project_name.retain(|c| !r#"\ / : * ? " < > | "#.contains(c));
     if project_name.len() == 0 {
-        panic!("Имя проекта должно содержать хотябы 1 разрешенный символ");
+        panic!("Имя проекта должно содержать хотябы 1 разрешенный символ!");
     }
     project_name.trim().to_string()
 }
@@ -75,11 +78,12 @@ fn main() {
     match path_check {
         true => {
             let proj_name = check_project_name();
-            println!("-->Создаю проект в: {}", &typing_path);
+            let proj_path = [typing_path.clone(), "/".to_string(), proj_name.clone()].join("");
+            println!("-->Создаю проект в: {}", typing_path);
             change_dir(&typing_path);
-            create_dir(&proj_name);
+            create_dir(&typing_path, &proj_name);
             println!("-->Создаю виртуальное окружение...");
-            create_venv(&proj_name);
+            create_venv(&proj_path, &proj_name);
             git_initialization(&[typing_path, "/".to_string() ,proj_name, "/git".to_string()].join(""));
             println!("-->Проект успешно создан!");
         }
