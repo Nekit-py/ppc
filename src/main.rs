@@ -17,14 +17,6 @@ fn git_initialization(path: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn change_dir(path: &str) {
-    //Переход по указанному пути
-    let _chdir = Command::new("cd")
-        .arg(path)
-        .status()
-        .expect("an unknown error occurred");
-}
-
 fn create_dir(where_to_create: &str, dir_name: &str) -> std::io::Result<()> {
     //Создание пустой папки
     fs::create_dir([where_to_create, "/", dir_name].join(""))?;
@@ -78,7 +70,6 @@ fn main() {
             let proj_name = check_project_name();
             let proj_path = [typing_path.clone(), "/".to_string(), proj_name.clone()].join("");
             println!("-->Создаю проект в: {}", typing_path);
-            change_dir(&typing_path);
             create_dir(&typing_path, &proj_name);
             println!("-->Создаю виртуальное окружение...");
             create_venv(&proj_path, &proj_name);
