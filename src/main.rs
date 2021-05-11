@@ -1,14 +1,9 @@
-use std::any::type_name;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::process::Command;
 use std::{fs, io};
 use std::io::Write;
-
-fn type_of<T>(_: T) -> &'static str {
-    type_name::<T>()
-}
 
 fn git_initialization(path: &str) -> Result<(), Box<dyn Error>> {
     //Инициализация гита
@@ -25,11 +20,12 @@ fn create_dir(where_to_create: &str, dir_name: &str) -> std::io::Result<()> {
 
 fn create_venv(proj_path: &str, proj_name: &str) -> Result<(), Box<dyn Error>> {
     //Создание виртуального окружения и пустого репозитория git
+    //TODO: проверку на существования python в системе
     let proj_venv: &str = &[proj_path, "/venv"].join("");
     let _cvenv = Command::new("python3")
         .args(&["-m", "venv", proj_venv])
         .status()?;
-    create_dir(&proj_path, "git");
+    create_dir(&proj_path, "git").expect("Не удалось создать папку git...");
     let mut gitignore = File::create(&[proj_path, "/git/.gitignore"].join(""))?;
     gitignore.write_all(b"__pycache__")?;
     let mut py_file = File::create(&[proj_path, "/git/", proj_name, ".py"].join(""))?;
@@ -70,10 +66,11 @@ fn main() {
             let proj_name = check_project_name();
             let proj_path = [typing_path.clone(), "/".to_string(), proj_name.clone()].join("");
             println!("-->Создаю проект в: {}", typing_path);
-            create_dir(&typing_path, &proj_name);
+            create_dir(&typing_path, &proj_name).expect("Не удалось создать папку проекта...");
             println!("-->Создаю виртуальное окружение...");
-            create_venv(&proj_path, &proj_name);
-            git_initialization(&[typing_path, "/".to_string() ,proj_name, "/git".to_string()].join(""));
+            create_venv(&proj_path, &proj_name).expect("При создании виртуального окружения произошла ошибка...");
+            git_initialization(&[typing_path, "/".to_string() ,proj_name, "/git".to_string()].join(""))
+                        .expect("Ошибка при инициализации git репозитория...");
             println!("-->Проект успешно создан!");
         }
         false => println!("Нвозможно создать проект, указан некорректный путь."),
