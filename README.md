@@ -10,3 +10,6 @@ python_project_creator
   * инициализирует репозиторий
   * создает .gitignore
   * файл с расширением ".py" с именем проекта
+
+#### Применение
+open ppc -p /Users/proprogrammer/Documents/python_projects -n new_ppc -g
