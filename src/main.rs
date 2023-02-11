@@ -1,94 +1,132 @@
+use std::env;
 use std::error::Error;
-use std::fs::File;
-use std::io::Write;
+use std::fs::{create_dir, File};
+use std::io::{stdin, Write};
 use std::path::Path;
 use std::process::Command;
-use std::fs;
-use clap::{Arg, App};
 
-extern crate clap;
-
-
-fn check_base_path(base_path: &str) -> (String, bool) {
-    //checking the existence of a path
-    let exist: bool = Path::new(&base_path.trim()).exists();
-    (base_path.trim().to_string(), exist)
+#[derive(Debug)]
+pub struct UnixProject {
+    base_path: String,
+    project_name: String,
+    project_path: Option<String>,
 }
 
-fn check_project_name(ps: &str) -> String {
-    //Checking the folder name for correctness
-    ps.to_string().retain(|c| !r#"\ / : * ? " < > | "#.contains(c));
-    let mut project_name = ps; 
-    if project_name.len() == 0 {
-        println!("The project name is set by default.");
-        project_name = "ppc_new";
-    }
-    project_name.trim().to_string()
-}
-
-fn git_initialization(path: &str) -> Result<(), Box<dyn Error>> {
-    println!("Initializing the git repository...");
-    let _git_init = Command::new("git").current_dir(path).arg("init").status()?;
-    Ok(())
-}
-
-fn create_venv(proj_path: &str, project_name: &str) -> Result<(), Box<dyn Error>> {
-    //Creating a virtual environment and epmty git
-    let proj_venv: &str = &[proj_path, "/venv"].join("");
-    println!("Creating a virtual environment...");
-    let _cvenv = Command::new("python3")
-        .args(&["-m", "venv", proj_venv])
-        .status()?;
-    fs::create_dir([&proj_path, "/", "git"].join(""))
-        .expect("Failed to create git folder...");
-    let mut gitignore = File::create(&[proj_path, "/git/.gitignore"].join(""))?;
-    gitignore.write_all(b"__pycache__")?;
-    let mut py_file = File::create(&[proj_path, "/git/", project_name, ".py"].join(""))?;
-    py_file.write_all(
-        b"def main():\n\tprint('Hello, world!')\n\nif __name__ == '__main__':\n\tmain()",
-    )?;
-    Ok(())
-}
-
-fn main() {
-    let matches = App::new("Python project creator")
-        .version("0.2.0")
-        .author("Nekit S. <nekit-sns@yandex.ru>")
-        .about("Helps you quickly create a python project including a virtual environment and git repository initialization.")
-        .arg(Arg::with_name("path")
-                 .short("p")
-                 .long("path")
-                 .takes_value(true)
-                 .help("Absolute path to the folder where the project will be created."))
-        .arg(Arg::with_name("name")
-                 .short("n")
-                 .long("name")
-                 .takes_value(true)
-                 .help("Project name."))
-        .arg(Arg::with_name("git")
-                 .short("g")
-                 .long("git")
-                 .takes_value(false)
-                 .help("Git repository initialization."))
-        .get_matches();
-    let base_path = matches.value_of("path").expect("To create a project, the path must be specified");
-    let ps = matches.value_of("name").unwrap();
-    //let _git = matches.value_of("git");
-    let (typing_path, input_path_exists) = check_base_path(&base_path);
-    match input_path_exists {
-        true => {
-            let project_name = check_project_name(&ps);
-            let proj_path = [typing_path.clone(), "/".to_string(), project_name.clone()].join("");
-            fs::create_dir([&typing_path, "/", &project_name].join(""))
-                    .expect("Failed to create project folder...");
-            create_venv(&proj_path, &project_name)
-                .expect("An error occurred while creating the virtual environment...");
-            git_initialization(
-                &[typing_path, "/".to_string(), project_name.clone(), "/git".to_string()].join(""),
-                    )
-                .expect("Error when initializing the git repository...");
-            println!("Project '{}' created successfully.", project_name);
+impl UnixProject {
+    fn check_base_path(&mut self) {
+        //Проверка пути директории в которой будет создаваться проект
+        if Path::new(self.base_path.trim()).exists() == true {
+            self.base_path = self.base_path.trim().to_string();
+        } else {
+            let cwd = env::current_dir();
+            self.base_path = cwd.unwrap().into_os_string().into_string().unwrap();
         }
-        false => println!("Unable to create project, invalid path specified."),
+    }
+
+    fn check_project_name(&mut self) {
+        //Очищает имя проекта для корректного создания папки
+        self.project_name
+            .retain(|c| !r#"\ / : * ? " < > | "#.contains(c));
+        if self.project_name.len() == 0 {
+            println!("Некорректно введено имя проекта. Создается по умолчанию -> new_project");
+            self.project_name = "new_project".to_string();
+        }
+        self.project_name = self.project_name.trim().to_string();
+    }
+
+    fn create_folder(&mut self) {
+        //Создание папки проекта
+        let proj_folder = [
+            self.base_path.clone(),
+            "/".to_string(),
+            self.project_name.clone(),
+        ]
+        .join("");
+        self.project_path = Some(proj_folder.clone());
+        create_dir(proj_folder).unwrap_or_else(|e| panic!("Не удалось создать папку - {:?}", e));
+    }
+
+    fn create_main(&self) -> Result<(), Box<dyn Error>> {
+        let mut py_file =
+            File::create(&[self.project_path.clone().unwrap(), "/main.py".to_string()].join(""))?;
+        py_file.write_all(
+            b"def main():\n\tprint('Hello, world!')\n\nif __name__ == '__main__':\n\tmain()",
+        )?;
+        Ok(())
+    }
+
+    fn create_venv(&self) -> Result<(), Box<dyn Error>> {
+        println!("Создание виртуального окружения...");
+        let _cvenv = Command::new("python3")
+            .args(&[
+                "-m",
+                "venv",
+                &[self.project_path.clone().unwrap().as_str(), "/env"].join(""),
+            ])
+            .status()?;
+        Ok(())
+    }
+
+    fn git_init(&self) -> Result<(), Box<dyn Error>> {
+        println!("Создание файла .gitignore");
+        let mut gitignore = File::create(
+            &[
+                self.project_path.clone().unwrap(),
+                "/.gitignore".to_string(),
+            ]
+            .join(""),
+        )?;
+        gitignore.write_all(b"__pycache__\nenv")?;
+
+        println!("Инициализация git репозитория.");
+        let _git_init = Command::new("git")
+            .current_dir([self.project_path.clone().unwrap()].join(""))
+            .arg("init")
+            .status()?;
+        Ok(())
+    }
+
+    pub fn create_project(&mut self) {
+        self.check_base_path();
+        self.check_project_name();
+        self.create_folder();
+        self.create_main()
+            .unwrap_or_else(|e| panic!("Не удалось создать точку входа - {:?}", e));
+        self.create_venv()
+            .unwrap_or_else(|e| panic!("Не удалось создать виртуальное окружение - {:?}", e));
+        self.git_init()
+            .unwrap_or_else(|e| panic!("Не инициализировать репозиторий - {:?}", e));
+        println!(
+            "Проект {:?}. Путь: {:?}",
+            self.project_name,
+            self.project_path.clone().unwrap()
+        );
     }
 }
+fn main() {
+    println!("{}", env::consts::OS);
+
+    println!("Укажите путь для проекта:");
+    let mut base_path = String::new();
+
+    stdin()
+        .read_line(&mut base_path)
+        .expect("Failed to read line");
+
+    println!("Введите имя проекта:");
+    let mut project_name = String::new();
+
+    stdin()
+        .read_line(&mut project_name)
+        .expect("Failed to read line");
+
+    let mut new_project = UnixProject {
+        base_path: base_path,
+        project_name: project_name,
+        project_path: None,
+    };
+
+    new_project.create_project();
+    // print!("Project -> {:#?}", new_project);
+}
+
