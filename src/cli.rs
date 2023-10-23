@@ -1,8 +1,6 @@
 use clap::Parser;
-use std::convert::TryInto;
 use std::env;
 use std::error::Error;
-use std::fs::create_dir;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -26,7 +24,7 @@ impl Cli {
     fn check_and_create_folder(&mut self) {
         match &self.path {
             Some(path) => {
-                if path.exists() == true {
+                if path.exists() {
                     self.path = Some(path.clone())
                 } else {
                     panic!("{:?} - не существует", path)
@@ -36,14 +34,10 @@ impl Cli {
         }
     }
 
-    fn create_folder(&self) {
-        create_dir(self.path.clone().unwrap());
-    }
-
     //Очищает имя проекта для корректного создания папки
     fn check_project_name(&mut self) {
         self.name.retain(|c| !r#"\ / : * ? " < > | "#.contains(c));
-        if self.name.len() == 0 {
+        if self.name.is_empty() {
             println!("Некорректно введено имя проекта. Создается по умолчанию -> new_project");
             self.name = "new_project".to_string();
         }
@@ -62,10 +56,10 @@ impl Cli {
         println!("Создание виртуального окружения...");
         self.path.clone().unwrap().push("env");
         let _cvenv = Command::new("python3")
-            .args(&[
+            .args([
                 "-m",
                 "venv",
-                self.path.clone().unwrap().to_str().unwrap(), // &[self.path.clone().unwrap().into_os_string(), "/env"].join(""),
+                self.path.clone().unwrap().to_str().unwrap(), 
             ])
             .status()?;
         Ok(())
@@ -76,7 +70,7 @@ impl Cli {
         let mut gitignore_path = self.path.clone().unwrap();
         gitignore_path.push(".gitignore");
         let mut gitignore = File::create(gitignore_path)?;
-        gitignore.write_all(b"__pycache__\nenv")?;
+        gitignore.write_all(b"__pycache__\nenv\n**.env\n**.log")?;
 
         println!("Инициализация git репозитория.");
         let _git_init = Command::new("git")
@@ -86,13 +80,14 @@ impl Cli {
         Ok(())
     }
 
-    pub fn create(&mut self) {
+    pub fn create(&mut self) -> Result<(), Box<dyn Error>> {
         self.check_and_create_folder();
         self.check_project_name();
-        self.create_main();
-        self.create_venv();
-        if self.git == true {
-            let _ = self.git_init();
+        self.create_main()?;
+        self.create_venv()?;
+        if self.git {
+            self.git_init()?;
         }
+        Ok(())
     }
 }

@@ -1,8 +1,10 @@
 mod cli;
 use clap::Parser;
 use cli::Cli;
+use std::error::Error;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut cli = Cli::parse();
-    cli.create();
+    cli.create()?;
+    Ok(())
 }
